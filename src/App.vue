@@ -17,14 +17,48 @@
 
     <!-- Lista rođendana sa Viber linkovima -->
     <div class="section">
-      <h2>Kupci sa današnjim rođendanom (Viber)</h2>
-      <button @click="fetchViberLinks">Prikaži Viber korisnike</button>
+      <h2>Kupci sa Viber-om</h2>
+      <div class="viber-buttons">
+        <button @click="fetchViberLinksToday">Rođendani danas</button>
+        <div class="month-selector">
+          <select v-model="selectedMonth">
+            <option value="01">Januar</option>
+            <option value="02">Februar</option>
+            <option value="03">Mart</option>
+            <option value="04">April</option>
+            <option value="05">Maj</option>
+            <option value="06">Jun</option>
+            <option value="07">Jul</option>
+            <option value="08">Avgust</option>
+            <option value="09">Septembar</option>
+            <option value="10">Oktobar</option>
+            <option value="11">Novembar</option>
+            <option value="12">Decembar</option>
+          </select>
+          <button @click="fetchViberLinksMonth">Rođendani u mesecu</button>
+        </div>
+      </div>
       <ul class="viber-list">
         <li v-for="customer in viberLinks" :key="customer.link" class="viber-item">
           {{ customer.name }} {{ customer.surname }} - 
           <a :href="customer.link" target="_blank">Pošalji poruku</a>
         </li>
       </ul>
+    </div>
+
+    <!-- Dugme za podešavanje poruka -->
+    <button class="settings-btn" @click="showMessageModal = true">Podesi poruke</button>
+
+    <!-- Modal za unos poruka -->
+    <div v-if="showMessageModal" class="modal-overlay" @click="closeModal">
+      <div class="modal" @click.stop>
+        <h3>Podesi poruke</h3>
+        <label>Današnji rođendani:</label>
+        <textarea v-model="todayMessage" rows="3" placeholder="npr. 'Srećan rođendan, {name}!'"></textarea>
+        <label>Rođendani u mesecu:</label>
+        <textarea v-model="monthMessage" rows="3" placeholder="npr. 'U vašem rođendanskom mesecu, {name}, iskoristite 20% popusta!'"></textarea>
+        <button @click="saveMessages">Sačuvaj i zatvori</button>
+      </div>
     </div>
   </div>
 </template>
@@ -40,8 +74,20 @@ export default {
         phone: "",
         has_viber: false
       },
-      viberLinks: []
+      todayMessage: localStorage.getItem("todayMessage") || "Srećan rođendan, {name}!",
+      monthMessage: localStorage.getItem("monthMessage") || "U vašem rođendanskom mesecu, {name}, iskoristite 20% popusta!",
+      selectedMonth: new Date().getMonth() + 2 > 12 ? "01" : String(new Date().getMonth() + 2).padStart(2, "0"), // Sledeći mesec
+      viberLinks: [],
+      showMessageModal: false
     };
+  },
+  watch: {
+    todayMessage(newValue) {
+      localStorage.setItem("todayMessage", newValue);
+    },
+    monthMessage(newValue) {
+      localStorage.setItem("monthMessage", newValue);
+    }
   },
   methods: {
     async addCustomer() {
@@ -58,12 +104,30 @@ export default {
         alert("Greška: " + error);
       }
     },
-    async fetchViberLinks() {
+    async fetchViberLinksToday() {
       try {
-        const response = await fetch("https://parfimerija-backend.onrender.com/viber-links");
+        const url = `https://parfimerija-backend.onrender.com/viber-links-today?message=${encodeURIComponent(this.todayMessage)}`;
+        const response = await fetch(url);
         this.viberLinks = await response.json();
       } catch (error) {
         alert("Greška pri dohvatanju Viber linkova: " + error);
+      }
+    },
+    async fetchViberLinksMonth() {
+      try {
+        const url = `https://parfimerija-backend.onrender.com/viber-links-month?month=${this.selectedMonth}&message=${encodeURIComponent(this.monthMessage)}`;
+        const response = await fetch(url);
+        this.viberLinks = await response.json();
+      } catch (error) {
+        alert("Greška pri dohvatanju Viber linkova: " + error);
+      }
+    },
+    saveMessages() {
+      this.showMessageModal = false;
+    },
+    closeModal(event) {
+      if (event.target.classList.contains("modal-overlay")) {
+        this.showMessageModal = false;
       }
     }
   }
@@ -79,6 +143,7 @@ export default {
   background-color: #f9f9f9;
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  position: relative;
 }
 h1 {
   color: #333;
@@ -91,13 +156,17 @@ h1 {
   border-radius: 5px;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
 }
-input {
+input, textarea, select {
   display: block;
   width: 100%;
   margin: 10px 0;
   padding: 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
+  box-sizing: border-box;
+}
+textarea {
+  resize: vertical;
 }
 button {
   background-color: #4CAF50;
@@ -110,6 +179,16 @@ button {
 }
 button:hover {
   background-color: #45a049;
+}
+.viber-buttons {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+.month-selector {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 .viber-list {
   list-style: none;
@@ -130,5 +209,40 @@ button:hover {
 }
 .viber-item a:hover {
   text-decoration: underline;
+}
+.settings-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #0078d4;
+  padding: 10px;
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.modal {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+.modal h3 {
+  margin-top: 0;
+}
+.modal label {
+  display: block;
+  margin: 10px 0 5px;
 }
 </style>
