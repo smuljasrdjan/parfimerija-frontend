@@ -10,14 +10,14 @@
       <input v-model="newCustomer.dob" placeholder="Datum rođenja (YYYY-MM-DD)" type="date" />
       <input v-model="newCustomer.phone" placeholder="Broj telefona" />
       <label>
-        <input type="checkbox" v-model="newCustomer.has_viber" /> Ima Viber
+        <input type="checkbox" v-model="newCustomer.has_viber" /> Ima Viber (opciono)
       </label>
       <button @click="addCustomer">Dodaj kupca</button>
     </div>
 
     <!-- Lista rođendana sa Viber linkovima -->
     <div class="section">
-      <h2>Kupci sa Viber-om</h2>
+      <h2>Kupci</h2>
       <div class="viber-buttons">
         <button @click="fetchViberLinksToday">Rođendani danas</button>
         <div class="month-selector">
@@ -39,9 +39,11 @@
         </div>
       </div>
       <ul class="viber-list">
-        <li v-for="customer in viberLinks" :key="customer.link" class="viber-item">
+        <li v-for="customer in viberLinks" :key="customer.phone" :class="getCustomerClass(customer)" class="viber-item">
           {{ customer.name }} {{ customer.surname }} - 
-          <a :href="customer.link" target="_blank">Pošalji poruku</a>
+          <span class="send-link" @click="sendViberMessage(customer)">Pošalji poruku</span>
+          <span v-if="customer.sent" class="sent-icon">✓</span>
+          <span v-if="customer.noViber" class="no-viber">Kupac nema Viber</span>
         </li>
       </ul>
     </div>
@@ -76,7 +78,7 @@ export default {
       },
       todayMessage: localStorage.getItem("todayMessage") || "Srećan rođendan, {name}!",
       monthMessage: localStorage.getItem("monthMessage") || "U vašem rođendanskom mesecu, {name}, iskoristite 20% popusta!",
-      selectedMonth: new Date().getMonth() + 2 > 12 ? "01" : String(new Date().getMonth() + 2).padStart(2, "0"), // Sledeći mesec
+      selectedMonth: new Date().getMonth() + 2 > 12 ? "01" : String(new Date().getMonth() + 2).padStart(2, "0"),
       viberLinks: [],
       showMessageModal: false
     };
@@ -107,20 +109,59 @@ export default {
     async fetchViberLinksToday() {
       try {
         const url = `https://parfimerija-backend.onrender.com/viber-links-today?message=${encodeURIComponent(this.todayMessage)}`;
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         this.viberLinks = await response.json();
+        this.viberLinks.forEach(customer => {
+          customer.sent = localStorage.getItem(`sent_${customer.phone}`) === "true";
+          customer.noViber = localStorage.getItem(`noViber_${customer.phone}`) === "true";
+        });
       } catch (error) {
-        alert("Greška pri dohvatanju Viber linkova: " + error);
+        if (error.name === "TimeoutError") {
+          alert("Server se budi, pokušaj ponovo za trenutak.");
+        } else {
+          alert("Greška pri dohvatanju Viber linkova: " + error);
+        }
       }
     },
     async fetchViberLinksMonth() {
       try {
         const url = `https://parfimerija-backend.onrender.com/viber-links-month?month=${this.selectedMonth}&message=${encodeURIComponent(this.monthMessage)}`;
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         this.viberLinks = await response.json();
+        this.viberLinks.forEach(customer => {
+          customer.sent = localStorage.getItem(`sent_${customer.phone}`) === "true";
+          customer.noViber = localStorage.getItem(`noViber_${customer.phone}`) === "true";
+        });
       } catch (error) {
-        alert("Greška pri dohvatanju Viber linkova: " + error);
+        if (error.name === "TimeoutError") {
+          alert("Server se budi, pokušaj ponovo za trenutak.");
+        } else {
+          alert("Greška pri dohvatanju Viber linkova: " + error);
+        }
       }
+    },
+    sendViberMessage(customer) {
+      const link = customer.link;
+      window.location.href = link;
+      // Provera da li je Viber otvoren – ovo nije savršeno, ali koristimo timeout kao heuristiku
+      setTimeout(() => {
+        if (document.hidden) { // Ako je aplikacija u pozadini, pretpostavljamo da je Viber otvoren
+          customer.sent = true;
+          localStorage.setItem(`sent_${customer.phone}`, "true");
+        } else {
+          customer.noViber = true;
+          localStorage.setItem(`noViber_${customer.phone}`, "true");
+          alert("Kupac nema Viber");
+        }
+      }, 1000); // 1 sekunda čekanja da se proveri
+    },
+    getCustomerClass(customer) {
+      return {
+        "sent": customer.sent,
+        "no-viber": customer.noViber
+      };
     },
     saveMessages() {
       this.showMessageModal = false;
@@ -200,15 +241,30 @@ button:hover {
   background-color: #f1f1f1;
   border-radius: 4px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 10px;
 }
-.viber-item a {
+.viber-item.sent {
+  background-color: #e6ffe6; /* Zelena za poslate poruke */
+}
+.viber-item.no-viber {
+  background-color: #ffe6e6; /* Crvena za one bez Vibera */
+}
+.send-link {
   color: #0078d4;
   text-decoration: none;
+  cursor: pointer;
 }
-.viber-item a:hover {
+.send-link:hover {
   text-decoration: underline;
+}
+.sent-icon {
+  color: #4CAF50;
+  font-weight: bold;
+}
+.no-viber {
+  color: #d32f2f;
+  font-style: italic;
 }
 .settings-btn {
   position: fixed;
