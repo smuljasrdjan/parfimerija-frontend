@@ -9,9 +9,6 @@
       <input v-model="newCustomer.surname" placeholder="Prezime" />
       <input v-model="newCustomer.dob" placeholder="Datum rođenja (YYYY-MM-DD)" type="date" />
       <input v-model="newCustomer.phone" placeholder="Broj telefona" />
-      <label>
-        <input type="checkbox" v-model="newCustomer.has_viber" /> Ima Viber (opciono)
-      </label>
       <button @click="addCustomer">Dodaj kupca</button>
     </div>
 
@@ -37,21 +34,7 @@
           </select>
           <button @click="fetchViberLinksMonth">Rođendani u mesecu</button>
         </div>
-        <button @click="showCopyOptions = !showCopyOptions">Prikaži poruke za kopiranje</button>
       </div>
-
-      <!-- Poruke za kopiranje -->
-      <div v-if="showCopyOptions" class="copy-options">
-        <div class="message-option">
-          <span>Današnji rođendani: "{{ todayMessage }}"</span>
-          <button @click="copyMessage(todayMessage)">Kopiraj</button>
-        </div>
-        <div class="message-option">
-          <span>Rođendani u mesecu: "{{ monthMessage }}"</span>
-          <button @click="copyMessage(monthMessage)">Kopiraj</button>
-        </div>
-      </div>
-
       <ul class="viber-list">
         <li v-for="customer in viberLinks" :key="customer.phone" :class="getCustomerClass(customer)" class="viber-item">
           {{ customer.name }} {{ customer.surname }} - 
@@ -66,14 +49,16 @@
     <!-- Dugme za podešavanje poruka -->
     <button class="settings-btn" @click="showMessageModal = true">Podesi poruke</button>
 
-    <!-- Modal za unos poruka -->
+    <!-- Modal za unos i kopiranje poruka -->
     <div v-if="showMessageModal" class="modal-overlay" @click="closeModal">
       <div class="modal" @click.stop>
         <h3>Podesi poruke</h3>
         <label>Današnji rođendani:</label>
         <textarea v-model="todayMessage" rows="3" placeholder="npr. 'Srećan rođendan, {name}!'"></textarea>
+        <button @click="copyMessage(todayMessage)">Kopiraj današnju poruku</button>
         <label>Rođendani u mesecu:</label>
         <textarea v-model="monthMessage" rows="3" placeholder="npr. 'U vašem rođendanskom mesecu, {name}, iskoristite 20% popusta!'"></textarea>
+        <button @click="copyMessage(monthMessage)">Kopiraj mesečnu poruku</button>
         <button @click="saveMessages">Sačuvaj i zatvori</button>
       </div>
     </div>
@@ -88,15 +73,13 @@ export default {
         name: "",
         surname: "",
         dob: "",
-        phone: "",
-        has_viber: false
+        phone: ""
       },
       todayMessage: localStorage.getItem("todayMessage") || "Srećan rođendan, {name}!",
       monthMessage: localStorage.getItem("monthMessage") || "U vašem rođendanskom mesecu, {name}, iskoristite 20% popusta!",
       selectedMonth: new Date().getMonth() + 2 > 12 ? "01" : String(new Date().getMonth() + 2).padStart(2, "0"),
       viberLinks: [],
-      showMessageModal: false,
-      showCopyOptions: false
+      showMessageModal: false
     };
   },
   watch: {
@@ -117,7 +100,7 @@ export default {
         });
         const result = await response.json();
         alert(result.message);
-        this.newCustomer = { name: "", surname: "", dob: "", phone: "", has_viber: false };
+        this.newCustomer = { name: "", surname: "", dob: "", phone: "" };
       } catch (error) {
         alert("Greška: " + error);
       }
@@ -250,29 +233,6 @@ button:hover {
   gap: 10px;
   align-items: center;
 }
-.copy-options {
-  margin: 10px 0;
-  padding: 10px;
-  background-color: #f0f0f0;
-  border-radius: 4px;
-}
-.message-option {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 5px 0;
-}
-.message-option span {
-  color: #333;
-}
-.message-option button {
-  background-color: #0078d4;
-  padding: 5px 10px;
-  font-size: 12px;
-}
-.message-option button:hover {
-  background-color: #005bb5;
-}
 .viber-list {
   list-style: none;
   padding: 0;
@@ -342,5 +302,8 @@ button:hover {
 .modal label {
   display: block;
   margin: 10px 0 5px;
+}
+.modal button {
+  margin: 5px 0;
 }
 </style>
