@@ -42,6 +42,7 @@
         <li v-for="customer in viberLinks" :key="customer.phone" :class="getCustomerClass(customer)" class="viber-item">
           {{ customer.name }} {{ customer.surname }} - 
           <span class="send-link" @click="sendViberMessage(customer)">Pošalji poruku</span>
+          <span v-if="!customer.noViber" class="confirm-link" @click="confirmSent(customer)">Potvrdi slanje</span>
           <span v-if="customer.sent" class="sent-icon">✓</span>
           <span v-if="customer.noViber" class="no-viber">Kupac nema Viber</span>
         </li>
@@ -143,19 +144,13 @@ export default {
       }
     },
     sendViberMessage(customer) {
-      const link = customer.link;
-      window.location.href = link;
-      // Provera da li je Viber otvoren – ovo nije savršeno, ali koristimo timeout kao heuristiku
-      setTimeout(() => {
-        if (document.hidden) { // Ako je aplikacija u pozadini, pretpostavljamo da je Viber otvoren
-          customer.sent = true;
-          localStorage.setItem(`sent_${customer.phone}`, "true");
-        } else {
-          customer.noViber = true;
-          localStorage.setItem(`noViber_${customer.phone}`, "true");
-          alert("Kupac nema Viber");
-        }
-      }, 1000); // 1 sekunda čekanja da se proveri
+      window.location.href = customer.link; // Otvara Viber chat
+    },
+    confirmSent(customer) {
+      customer.sent = true;
+      customer.noViber = false; // Resetujemo ako je prethodno označeno kao bez Vibera
+      localStorage.setItem(`sent_${customer.phone}`, "true");
+      localStorage.removeItem(`noViber_${customer.phone}`);
     },
     getCustomerClass(customer) {
       return {
@@ -250,12 +245,12 @@ button:hover {
 .viber-item.no-viber {
   background-color: #ffe6e6; /* Crvena za one bez Vibera */
 }
-.send-link {
+.send-link, .confirm-link {
   color: #0078d4;
   text-decoration: none;
   cursor: pointer;
 }
-.send-link:hover {
+.send-link:hover, .confirm-link:hover {
   text-decoration: underline;
 }
 .sent-icon {
