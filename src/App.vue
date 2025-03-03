@@ -37,7 +37,21 @@
           </select>
           <button @click="fetchViberLinksMonth">Rođendani u mesecu</button>
         </div>
+        <button @click="showCopyOptions = !showCopyOptions">Prikaži poruke za kopiranje</button>
       </div>
+
+      <!-- Poruke za kopiranje -->
+      <div v-if="showCopyOptions" class="copy-options">
+        <div class="message-option">
+          <span>Današnji rođendani: "{{ todayMessage }}"</span>
+          <button @click="copyMessage(todayMessage)">Kopiraj</button>
+        </div>
+        <div class="message-option">
+          <span>Rođendani u mesecu: "{{ monthMessage }}"</span>
+          <button @click="copyMessage(monthMessage)">Kopiraj</button>
+        </div>
+      </div>
+
       <ul class="viber-list">
         <li v-for="customer in viberLinks" :key="customer.phone" :class="getCustomerClass(customer)" class="viber-item">
           {{ customer.name }} {{ customer.surname }} - 
@@ -81,7 +95,8 @@ export default {
       monthMessage: localStorage.getItem("monthMessage") || "U vašem rođendanskom mesecu, {name}, iskoristite 20% popusta!",
       selectedMonth: new Date().getMonth() + 2 > 12 ? "01" : String(new Date().getMonth() + 2).padStart(2, "0"),
       viberLinks: [],
-      showMessageModal: false
+      showMessageModal: false,
+      showCopyOptions: false
     };
   },
   watch: {
@@ -143,12 +158,21 @@ export default {
         }
       }
     },
+    copyMessage(message) {
+      navigator.clipboard.writeText(message)
+        .then(() => {
+          alert("Poruka kopirana u clipboard: " + message);
+        })
+        .catch(err => {
+          alert("Greška pri kopiranju poruke: " + err);
+        });
+    },
     sendViberMessage(customer) {
-      window.location.href = customer.link; // Otvara Viber chat
+      window.location.href = customer.link;
     },
     confirmSent(customer) {
       customer.sent = true;
-      customer.noViber = false; // Resetujemo ako je prethodno označeno kao bez Vibera
+      customer.noViber = false;
       localStorage.setItem(`sent_${customer.phone}`, "true");
       localStorage.removeItem(`noViber_${customer.phone}`);
     },
@@ -226,6 +250,29 @@ button:hover {
   gap: 10px;
   align-items: center;
 }
+.copy-options {
+  margin: 10px 0;
+  padding: 10px;
+  background-color: #f0f0f0;
+  border-radius: 4px;
+}
+.message-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 5px 0;
+}
+.message-option span {
+  color: #333;
+}
+.message-option button {
+  background-color: #0078d4;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+.message-option button:hover {
+  background-color: #005bb5;
+}
 .viber-list {
   list-style: none;
   padding: 0;
@@ -240,10 +287,10 @@ button:hover {
   gap: 10px;
 }
 .viber-item.sent {
-  background-color: #e6ffe6; /* Zelena za poslate poruke */
+  background-color: #e6ffe6;
 }
 .viber-item.no-viber {
-  background-color: #ffe6e6; /* Crvena za one bez Vibera */
+  background-color: #ffe6e6;
 }
 .send-link, .confirm-link {
   color: #0078d4;
