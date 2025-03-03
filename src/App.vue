@@ -39,7 +39,7 @@
         <li v-for="customer in viberLinks" :key="customer.phone" :class="getCustomerClass(customer)" class="viber-item">
           {{ customer.name }} {{ customer.surname }} - 
           <span class="send-link" @click="sendViberMessage(customer)">Pošalji poruku</span>
-          <span v-if="!customer.noViber" class="confirm-link" @click="confirmSent(customer)">Potvrdi slanje</span>
+          <span v-if="!customer.noViber && !customer.sent" class="confirm-link" @click="confirmSent(customer)">Potvrdi slanje</span>
           <span v-if="customer.sent" class="sent-icon">✓</span>
           <span v-if="customer.noViber" class="no-viber">Kupac nema Viber</span>
         </li>
@@ -47,7 +47,7 @@
     </div>
 
     <!-- Dugme za podešavanje poruka -->
-    <button class="settings-btn" @click="showMessageModal = true">Podesi poruke</button>
+    <button class="settings-btn" @click="fetchMessagesAndShowModal">Podesi poruke</button>
 
     <!-- Modal za unos i kopiranje poruka -->
     <div v-if="showMessageModal" class="modal-overlay" @click="closeModal">
@@ -75,20 +75,12 @@ export default {
         dob: "",
         phone: ""
       },
-      todayMessage: localStorage.getItem("todayMessage") || "Srećan rođendan, {name}!",
-      monthMessage: localStorage.getItem("monthMessage") || "U vašem rođendanskom mesecu, {name}, iskoristite 20% popusta!",
+      todayMessage: "",
+      monthMessage: "",
       selectedMonth: new Date().getMonth() + 2 > 12 ? "01" : String(new Date().getMonth() + 2).padStart(2, "0"),
       viberLinks: [],
       showMessageModal: false
     };
-  },
-  watch: {
-    todayMessage(newValue) {
-      localStorage.setItem("todayMessage", newValue);
-    },
-    monthMessage(newValue) {
-      localStorage.setItem("monthMessage", newValue);
-    }
   },
   methods: {
     async addCustomer() {
@@ -111,10 +103,6 @@ export default {
         const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         this.viberLinks = await response.json();
-        this.viberLinks.forEach(customer => {
-          customer.sent = localStorage.getItem(`sent_${customer.phone}`) === "true";
-          customer.noViber = localStorage.getItem(`noViber_${customer.phone}`) === "true";
-        });
       } catch (error) {
         if (error.name === "TimeoutError") {
           alert("Server se budi, pokušaj ponovo za trenutak.");
@@ -129,16 +117,39 @@ export default {
         const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         this.viberLinks = await response.json();
-        this.viberLinks.forEach(customer => {
-          customer.sent = localStorage.getItem(`sent_${customer.phone}`) === "true";
-          customer.noViber = localStorage.getItem(`noViber_${customer.phone}`) === "true";
-        });
       } catch (error) {
         if (error.name === "TimeoutError") {
           alert("Server se budi, pokušaj ponovo za trenutak.");
         } else {
           alert("Greška pri dohvatanju Viber linkova: " + error);
         }
+      }
+    },
+    async sendViberMessage(customer) {
+      window.location.href = customer.link;
+    },
+    async confirmSent(customer) {
+      try {
+        await fetch("https://parfimerija-backend.onrender.com/mark-sent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: customer.phone })
+        });
+        customer.sent = true;
+        customer.noViber = false;
+      } catch (error) {
+        alert("Greška pri označavanju poruke kao poslate: " + error);
+      }
+    },
+    async fetchMessagesAndShowModal() {
+      try {
+        const response = await fetch("https://parfimerija-backend.onrender.com/messages");
+        const messages = await response.json();
+        this.todayMessage = messages.today;
+        this.monthMessage = messages.month;
+        this.showMessageModal = true;
+      } catch (error) {
+        alert("Greška pri dohvatanju poruka: " + error);
       }
     },
     copyMessage(message) {
@@ -150,23 +161,23 @@ export default {
           alert("Greška pri kopiranju poruke: " + err);
         });
     },
-    sendViberMessage(customer) {
-      window.location.href = customer.link;
-    },
-    confirmSent(customer) {
-      customer.sent = true;
-      customer.noViber = false;
-      localStorage.setItem(`sent_${customer.phone}`, "true");
-      localStorage.removeItem(`noViber_${customer.phone}`);
+    async saveMessages() {
+      try {
+        await fetch("https://parfimerija-backend.onrender.com/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ today: this.todayMessage, month: this.monthMessage })
+        });
+        this.showMessageModal = false;
+      } catch (error) {
+        alert("Greška pri čuvanju poruka: " + error);
+      }
     },
     getCustomerClass(customer) {
       return {
         "sent": customer.sent,
         "no-viber": customer.noViber
       };
-    },
-    saveMessages() {
-      this.showMessageModal = false;
     },
     closeModal(event) {
       if (event.target.classList.contains("modal-overlay")) {
